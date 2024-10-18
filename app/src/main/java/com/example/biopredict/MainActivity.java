@@ -2,6 +2,7 @@ package com.example.biopredict;
 
 import android.content.res.AssetFileDescriptor;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -14,26 +15,21 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import org.tensorflow.lite.Interpreter;
-import org.w3c.dom.Text;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
-
     EditText inputFieldAge;
-    EditText inputFieldWeight;
-
+    EditText inputFieldEjectFraction;
+    EditText inputFieldSerumCreatinine;
     Button predictBtn;
-
     TextView resultTV;
-
     Interpreter interpreter;
-
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,32 +40,35 @@ public class MainActivity extends AppCompatActivity {
         try {
             interpreter = new Interpreter(loadModelFile());
         } catch (IOException e) {
+            Log.e("Error: ", "Failed to create interpreter", e);
             throw new RuntimeException(e);
         }
 
-
         inputFieldAge = findViewById(R.id.editTextNumber);
-        inputFieldWeight = findViewById(R.id.editTextNumber2);
+        inputFieldEjectFraction = findViewById(R.id.editTextNumber3);
+        inputFieldSerumCreatinine = findViewById(R.id.editTextNumber2);
 
-        predictBtn=findViewById(R.id.button);
-        resultTV= findViewById(R.id.textView);
+        predictBtn = findViewById(R.id.button);
+        resultTV = findViewById(R.id.textView);
 
         predictBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 String ageInput = inputFieldAge.getText().toString();
-                String weightInput = inputFieldWeight.getText().toString();
+                String ejectFractionInput = inputFieldEjectFraction.getText().toString();
+                String serumCreatinineInput = inputFieldSerumCreatinine.getText().toString();
 
                 float ageValue = Float.parseFloat(ageInput);
-                float weightValue = Float.parseFloat(weightInput);
+                float ejectFractionValue = Float.parseFloat(ejectFractionInput);
+                float serumCreatinineValue = Float.parseFloat(serumCreatinineInput);
 
-                float[][] inputs = new float[1][2];
-                inputs[0][0] = ageValue;
-                inputs[0][1] = weightValue;
+                float[][] inputs = {{ageValue, ejectFractionValue, serumCreatinineValue}};
 
-                float result = doInference(inputs);
+                Map<String, Object> result = doInference(inputs);
 
-                resultTV.setText("Result: "+result);
+                resultTV.setText(
+                    String.format("%s \n Probability: %f", result.get("prediction"), result.get("probability"))
+                );
             }
         });
 
@@ -80,27 +79,24 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    public float doInference(float[][] input)
-    {
+    public Map<String, Object> doInference(float[][] input) {
         float[][] output = new float[1][1];
-        interpreter.run(input,output);
+        interpreter.run(input, output);
 
-        return output[0][0];
-
-
+        float probability = output[0][0];
+        return  Map.of(
+            "prediction",  probability > 0.5 ? "Death Event 💀" : "Survival 😁👌" ,
+            "probability", probability
+        );
     }
 
 
-    private MappedByteBuffer loadModelFile() throws IOException
-    {
-        AssetFileDescriptor assetFileDescriptor =    			this.getAssets().openFd("linear.tflite");
-        FileInputStream fileInputStream = new 		FileInputStream(assetFileDescriptor.getFileDescriptor());
+    private MappedByteBuffer loadModelFile() throws IOException {
+        AssetFileDescriptor assetFileDescriptor = this.getAssets().openFd("modelo_regresion_logistica1.tflite");
+        FileInputStream fileInputStream = new FileInputStream(assetFileDescriptor.getFileDescriptor());
         FileChannel fileChannel = fileInputStream.getChannel();
         long startOffset = assetFileDescriptor.getStartOffset();
         long length = assetFileDescriptor.getLength();
-        return         fileChannel.map(FileChannel.MapMode.READ_ONLY,startOffset,length);
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, length);
     }
-
-
-
 }
